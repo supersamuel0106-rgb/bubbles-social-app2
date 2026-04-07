@@ -1,7 +1,12 @@
 import logging
 import sys
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+# 確保在 Vercel 生產環境中能正確找到 app 資料夾
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 from app.api.router import api_router
 from app.core.config import settings
 from app.api.deps import engine
