@@ -14,7 +14,7 @@ interface InteractionScreenProps {
 interface FloatingBubbleProps {
   profile: Profile;
   isCurrentUser: boolean;
-  registerBubble: (id: string, x: any, y: any, radius: number) => void;
+  registerBubble: (id: string, x: MotionValue<number>, y: MotionValue<number>, radius: number) => void;
 }
 
 const FloatingBubble: React.FC<FloatingBubbleProps> = ({ profile, isCurrentUser, registerBubble }) => {
@@ -22,7 +22,7 @@ const FloatingBubble: React.FC<FloatingBubbleProps> = ({ profile, isCurrentUser,
   const y = useMotionValue(Math.random() * 200 - 100);
 
   useEffect(() => {
-    // 設定精確的物理碰撞半徑 (視覺上為 w-32 = 128px，故真實半徑稍微抓小一點為 58，允許些微貼齊)
+    // 設定精確的物理碰撞半徑
     registerBubble(profile.id, x, y, 58);
   }, [profile.id, x, y, registerBubble]);
 
@@ -80,13 +80,14 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pullProgress, setPullProgress] = useState(0);
 
   // --- Physics Engine Central State ---
   const physicsState = React.useRef(new Map<string, {x: MotionValue<number>, y: MotionValue<number>, vx: number, vy: number, radius: number}>());
 
   const registerBubble = React.useCallback((id: string, x: MotionValue<number>, y: MotionValue<number>, radius: number) => {
     if (!physicsState.current.has(id)) {
-      // Initialize with a faster random velocity
       physicsState.current.set(id, { 
         x, y, 
         vx: (Math.random() - 0.5) * 3.5, 
@@ -108,12 +109,10 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
     const physicsLoop = () => {
       if (!isActive) return;
 
-      // Approximate Boundaries based on typical screen size, preventing bubbles from fully leaving screen
       const boundaryW = (window.innerWidth / 2) - 80;
       const boundaryH = (window.innerHeight / 2) - 130;
       const bubbles = Array.from(physicsState.current.values()) as Array<{x: MotionValue<number>, y: MotionValue<number>, vx: number, vy: number, radius: number}>;
 
-      // 1. Position update and boundary collision
       for (const state of bubbles) {
         let cx = state.x.get();
         let cy = state.y.get();
@@ -130,41 +129,33 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
         state.y.set(cy);
       }
 
-      // 2. Elastic Body Collisions
       for (let i = 0; i < bubbles.length; i++) {
         for (let j = i + 1; j < bubbles.length; j++) {
           const a = bubbles[i];
           const b = bubbles[j];
-
           const dx = b.x.get() - a.x.get();
           const dy = b.y.get() - a.y.get();
           const dist = Math.hypot(dx, dy);
-          const minDist = a.radius + b.radius; // 精確的邊緣觸碰距離，移除先前的額外距離
+          const minDist = a.radius + b.radius;
 
           if (dist < minDist && dist > 0.01) {
-            // Normal vectors
             const nx = dx / dist;
             const ny = dy / dist;
-
-            // Force physical separation
             const overlap = minDist - dist;
             a.x.set(a.x.get() - nx * (overlap / 2));
             a.y.set(a.y.get() - ny * (overlap / 2));
             b.x.set(b.x.get() + nx * (overlap / 2));
             b.y.set(b.y.get() + ny * (overlap / 2));
 
-            // Perfectly elastic collision velocity exchange (assuming equal mass 1)
             const p = 2 * (a.vx * nx + a.vy * ny - b.vx * nx - b.vy * ny) / 2;
             a.vx -= p * nx;
             a.vy -= p * ny;
             b.vx += p * nx;
             b.vy += p * ny;
 
-            // Add more noticeable micro-chaos to prevent locking states and add bounce energy
             a.vx += (Math.random() - 0.5) * 0.5;
             a.vy += (Math.random() - 0.5) * 0.5;
 
-            // Higher Speed limit clamp
             const speedA = Math.hypot(a.vx, a.vy);
             if (speedA > 6.0) { a.vx *= 6.0/speedA; a.vy *= 6.0/speedA; }
             const speedB = Math.hypot(b.vx, b.vy);
@@ -172,35 +163,25 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
           }
         }
       }
-
       rafId = requestAnimationFrame(physicsLoop);
     };
 
     rafId = requestAnimationFrame(physicsLoop);
     return () => { isActive = false; cancelAnimationFrame(rafId); };
   }, []);
-  // --- End Physics Engine ---
 
   useEffect(() => {
     if (userId) {
       fetchProfiles();
     }
 
-    // --- 1. Supabase Realtime Subscription ---
-    // 監聽 profiles 資料表的所有變動 (UPDATE)
     const channel = supabase
       .channel('schema-db-changes')
       .on(
         'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'profiles'
-        },
+        { event: 'UPDATE', schema: 'public', table: 'profiles' },
         (payload) => {
-          console.log('Realtime update received:', payload);
           const updatedProfile = payload.new as Profile;
-          
           setProfiles((prev) => 
             prev.map((p) => (p.id === updatedProfile.id ? updatedProfile : p))
           );
@@ -208,10 +189,7 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
       )
       .subscribe();
 
-    // --- 2. Polling Fallback (10s) ---
-    // 多重保障：即便 Realtime 斷線或未啟用，每 10 秒也會靜默更新一次
     const pollingInterval = setInterval(() => {
-      console.log('Polling for new messages...');
       silentFetchProfiles();
     }, 10000);
 
@@ -234,49 +212,41 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
     try {
       setLoading(true);
       setError(null);
-      console.log('Fetching all profiles...');
       const data = await api.getAllProfiles();
-      console.log('Profiles data loaded:', data);
       setProfiles(data);
     } catch (err: any) {
       console.error('Failed to fetch profiles:', err);
       setError('無法載入使用者資料，請檢查後端連線。');
-      if (err instanceof ConnectionError) {
-        alert(err.message);
-      }
     } finally {
       setLoading(false);
     }
   };
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchProfiles();
+    setIsRefreshing(false);
+    setPullProgress(0);
+  };
+
   const handleSendMessage = async () => {
     if (!message.trim()) return;
-
     try {
       await api.updateMessage(userId, message);
-      // 更新本地狀態 (Optimistic UI)
       setProfiles(prev => prev.map(p => 
         p.id === userId ? { ...p, latest_message: message } : p
       ));
       setMessage('');
     } catch (err: any) {
       console.error('Error updating message:', err);
-      if (err instanceof ConnectionError) {
-        alert(err.message);
-      }
     }
   };
 
   const logoutButton = (
     <button 
       type="button"
-      onClick={() => {
-        console.log('Logout button clicked');
-        if (window.confirm('確定要登出嗎？')) {
-          onLogout();
-        }
-      }}
-      className="px-3 py-1.5 flex items-center gap-1.5 bg-[#FF3B30] text-white rounded-lg active:opacity-70 transition-opacity cursor-pointer relative z-[60]"
+      onClick={() => window.confirm('確定要登出嗎？') && onLogout()}
+      className="px-3 py-1.5 flex items-center gap-1.5 bg-[#FF3B30] text-white rounded-lg active:opacity-70 z-[60]"
     >
       <LogOut size={16} />
       <span className="text-sm font-semibold">登出</span>
@@ -294,34 +264,54 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
   }
 
   return (
-    <Layout 
-      title="Interaction" 
-      headerRight={logoutButton}
-    >
+    <Layout title="Interaction" headerRight={logoutButton}>
       <div className="flex flex-col min-h-[calc(100vh-64px)] bg-[#F2F2F7]">
-        {/* Interaction Canvas */}
-        <div className="flex-1 relative flex items-center justify-center overflow-hidden">
+        <motion.div 
+          className="flex-1 relative flex items-center justify-center overflow-hidden touch-none"
+          drag="y"
+          dragConstraints={{ top: 0, bottom: 0 }}
+          onDrag={(_, info) => {
+            if (info.offset.y > 0) setPullProgress(Math.min(info.offset.y / 1.2, 80));
+          }}
+          onDragEnd={(_, info) => {
+            if (info.offset.y > 100) handleRefresh();
+            else setPullProgress(0);
+          }}
+        >
+          {/* Pull Indicator */}
+          <motion.div 
+            style={{ y: pullProgress - 60 }} 
+            className="absolute top-0 left-0 right-0 flex justify-center p-4 z-[55] pointer-events-none"
+          >
+            <div className="bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-[#E5E5EA] px-4 py-2 flex items-center gap-2">
+              <motion.div 
+                animate={isRefreshing || pullProgress > 70 ? { rotate: 360 } : { rotate: pullProgress * 5 }}
+                transition={isRefreshing || pullProgress > 70 ? { repeat: Infinity, duration: 1, ease: "linear" } : {}}
+                className="w-4 h-4 border-2 border-[#007AFF] border-t-transparent rounded-full"
+              />
+              <span className="text-[11px] font-bold text-[#1C1C1E]">
+                {isRefreshing ? '正在更新...' : pullProgress > 70 ? '放開即可更新' : '下拉更新'}
+              </span>
+            </div>
+          </motion.div>
+
           {error ? (
             <div className="flex flex-col items-center z-10">
-              <p className="text-[#FF3B30] mb-4 bg-white/80 px-4 py-2 rounded-lg shadow-sm border border-[#FF3130]/20">{error}</p>
-              <Button onClick={fetchProfiles} className="w-auto px-6 h-10 text-sm">重試 (Retry)</Button>
+              <p className="text-[#FF3B30] mb-4 bg-white/80 px-4 py-2 rounded-lg">{error}</p>
+              <Button onClick={fetchProfiles} className="w-auto px-6 h-10 text-sm">重試</Button>
             </div>
           ) : profiles.length === 0 ? (
             <div className="flex flex-col items-center z-10">
               <p className="text-[#8E8E93] mb-4">目前沒有其他人在線上...</p>
-              <Button onClick={fetchProfiles} className="w-auto px-6 h-10 text-sm">刷新 (Refresh)</Button>
+              <Button onClick={fetchProfiles} className="w-auto px-6 h-10 text-sm">刷新</Button>
             </div>
           ) : (
             <>
-              {/* Debug Status Badge */}
               <div className="absolute top-6 left-6 flex items-center gap-2 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl shadow-lg border border-[#E5E5EA] z-[50]">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-[11px] font-bold text-[#1C1C1E]">
-                  互動網域已連線 ({profiles.length} 位在線)
-                </span>
+                <span className="text-[11px] font-bold text-[#1C1C1E]">互動網域已連線 ({profiles.length} 位)</span>
               </div>
               
-              {/* Render all floating bubbles */}
               {profiles.map(profile => (
                 <FloatingBubble 
                   key={profile.id} 
@@ -333,16 +323,14 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
             </>
           )}
 
-          {/* Ambient Background Dots */}
           <div className="absolute top-20 left-10 w-2 h-2 rounded-full bg-[#007AFF]/20 animate-pulse"></div>
           <div className="absolute bottom-40 right-10 w-3 h-3 rounded-full bg-[#5856D6]/20 animate-pulse delay-700"></div>
-        </div>
+        </motion.div>
 
-        {/* Bottom Input Bar */}
         <div className="p-6 bg-white/80 backdrop-blur-xl border-t border-[#C6C6C8] pb-10 relative z-50">
           <div className="max-w-2xl mx-auto flex flex-col gap-2">
-            <span className="text-xs text-[#8E8E93] font-medium tracking-wide ml-2">更新您的狀態留言</span>
-            <div className="flex items-center gap-3 bg-[#F2F2F7] p-2 pl-5 rounded-full border border-[#E5E5EA] focus-within:bg-white focus-within:shadow-lg transition-all">
+            <span className="text-xs text-[#8E8E93] font-medium ml-2">更新您的狀態留言</span>
+            <div className="flex items-center gap-3 bg-[#F2F2F7] p-2 pl-5 rounded-full border border-[#E5E5EA] focus-within:bg-white transition-all">
               <input 
                 type="text" 
                 value={message}
@@ -351,10 +339,7 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
                 placeholder="說些什麼吧..."
                 className="flex-grow bg-transparent border-none focus:ring-0 text-[#1C1C1E] font-medium py-2"
               />
-              <button 
-                onClick={handleSendMessage}
-                className="bg-[#007AFF] text-white h-10 w-10 flex items-center justify-center rounded-full shadow-lg active:scale-90 transition-transform flex-shrink-0"
-              >
+              <button onClick={handleSendMessage} className="bg-[#007AFF] text-white h-10 w-10 flex items-center justify-center rounded-full active:scale-90 transition-transform">
                 <Send size={18} />
               </button>
             </div>
