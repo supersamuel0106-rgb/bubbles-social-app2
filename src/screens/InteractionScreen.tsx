@@ -87,11 +87,11 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
 
   const registerBubble = React.useCallback((id: string, x: MotionValue<number>, y: MotionValue<number>, radius: number) => {
     if (!physicsState.current.has(id)) {
-      // Initialize with random gentle velocity
+      // Initialize with a faster random velocity
       physicsState.current.set(id, { 
         x, y, 
-        vx: (Math.random() - 0.5) * 1.2, 
-        vy: (Math.random() - 0.5) * 1.2, 
+        vx: (Math.random() - 0.5) * 3.5, 
+        vy: (Math.random() - 0.5) * 3.5, 
         radius 
       });
     } else {
@@ -161,15 +161,15 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
             b.vx += p * nx;
             b.vy += p * ny;
 
-            // Add micro-chaos to prevent locking states
-            a.vx += (Math.random() - 0.5) * 0.1;
-            a.vy += (Math.random() - 0.5) * 0.1;
+            // Add more noticeable micro-chaos to prevent locking states and add bounce energy
+            a.vx += (Math.random() - 0.5) * 0.5;
+            a.vy += (Math.random() - 0.5) * 0.5;
 
-            // Speed limit clamp
+            // Higher Speed limit clamp
             const speedA = Math.hypot(a.vx, a.vy);
-            if (speedA > 2.5) { a.vx *= 2.5/speedA; a.vy *= 2.5/speedA; }
+            if (speedA > 6.0) { a.vx *= 6.0/speedA; a.vy *= 6.0/speedA; }
             const speedB = Math.hypot(b.vx, b.vy);
-            if (speedB > 2.5) { b.vx *= 2.5/speedB; b.vy *= 2.5/speedB; }
+            if (speedB > 6.0) { b.vx *= 6.0/speedB; b.vy *= 6.0/speedB; }
           }
         }
       }
