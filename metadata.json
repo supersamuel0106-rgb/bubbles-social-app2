@@ -1,0 +1,5 @@
+{
+  "name": "Atelier Social",
+  "description": "A minimal, iOS-inspired social app for sharing moments and messages.",
+  "requestFramePermissions": ["camera"]
+}

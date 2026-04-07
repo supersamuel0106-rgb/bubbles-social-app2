@@ -1,0 +1,14 @@
+{
+  "python.defaultInterpreterPath": ".venv/Scripts/python.exe",
+  "python.analysis.extraPaths": [
+    "./backend",
+    "./.venv/Lib/site-packages"
+  ],
+  "python.analysis.typeCheckingMode": "basic",
+  "python.venvPath": ".",
+  "python.analysis.diagnosticMode": "workspace",
+  "python.languageServer": "Default",
+  "python.terminal.useEnvFile": true,
+  "css.lint.unknownAtRules": "ignore",
+  "scss.lint.unknownAtRules": "ignore"
+}
