@@ -22,10 +22,9 @@ const FloatingBubble: React.FC<FloatingBubbleProps> = ({ profile, isCurrentUser,
   const y = useMotionValue(Math.random() * 200 - 100);
 
   useEffect(() => {
-    // Current user's avatar is slightly larger, hence a bigger collision radius 
-    // Roughly matches the CSS dimensions + margin padding for visual breathing room
-    registerBubble(profile.id, x, y, isCurrentUser ? 75 : 55);
-  }, [profile.id, x, y, isCurrentUser, registerBubble]);
+    // 設定精確的物理碰撞半徑 (視覺上為 w-32 = 128px，故真實半徑稍微抓小一點為 58，允許些微貼齊)
+    registerBubble(profile.id, x, y, 58);
+  }, [profile.id, x, y, registerBubble]);
 
   return (
     <motion.div 
@@ -140,7 +139,7 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
           const dx = b.x.get() - a.x.get();
           const dy = b.y.get() - a.y.get();
           const dist = Math.hypot(dx, dy);
-          const minDist = a.radius + b.radius + 20; // 20px padding field
+          const minDist = a.radius + b.radius; // 精確的邊緣觸碰距離，移除先前的額外距離
 
           if (dist < minDist && dist > 0.01) {
             // Normal vectors
