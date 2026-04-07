@@ -185,7 +185,50 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
     if (userId) {
       fetchProfiles();
     }
+
+    // --- 1. Supabase Realtime Subscription ---
+    // 監聽 profiles 資料表的所有變動 (UPDATE)
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles'
+        },
+        (payload) => {
+          console.log('Realtime update received:', payload);
+          const updatedProfile = payload.new as Profile;
+          
+          setProfiles((prev) => 
+            prev.map((p) => (p.id === updatedProfile.id ? updatedProfile : p))
+          );
+        }
+      )
+      .subscribe();
+
+    // --- 2. Polling Fallback (10s) ---
+    // 多重保障：即便 Realtime 斷線或未啟用，每 10 秒也會靜默更新一次
+    const pollingInterval = setInterval(() => {
+      console.log('Polling for new messages...');
+      silentFetchProfiles();
+    }, 10000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(pollingInterval);
+    };
   }, [userId]);
+
+  const silentFetchProfiles = async () => {
+    try {
+      const data = await api.getAllProfiles();
+      setProfiles(data);
+    } catch (err) {
+      console.error('Silent fetch failed:', err);
+    }
+  };
 
   const fetchProfiles = async () => {
     try {
