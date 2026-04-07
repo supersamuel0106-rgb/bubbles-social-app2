@@ -1,13 +1,12 @@
 {
-  "version": 2,
-  "rewrites": [
-    {
-      "source": "/api/v1/:path*",
-      "destination": "backend/main.py"
+  "experimentalServices": {
+    "frontend": {
+      "routePrefix": "/",
+      "framework": "vite"
     },
-    {
-      "source": "/(.*)",
-      "destination": "/"
+    "backend": {
+      "entrypoint": "backend/main.py",
+      "routePrefix": "/api/v1"
     }
-  ]
+  }
 }
