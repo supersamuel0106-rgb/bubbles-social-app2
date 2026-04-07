@@ -3,7 +3,7 @@ import { Layout, Button } from '../components/UI';
 import { Profile } from '../types';
 import { supabase } from '../lib/supabase';
 import { api, ConnectionError } from '../lib/api';
-import { motion, useAnimation } from 'motion/react';
+import { motion, useMotionValue, MotionValue } from 'motion/react';
 import { Send, LogOut } from 'lucide-react';
 
 interface InteractionScreenProps {
@@ -11,37 +11,29 @@ interface InteractionScreenProps {
   onLogout: () => void;
 }
 
-const FloatingBubble: React.FC<{ profile: Profile; isCurrentUser: boolean }> = ({ profile, isCurrentUser }) => {
-  const controls = useAnimation();
+interface FloatingBubbleProps {
+  profile: Profile;
+  isCurrentUser: boolean;
+  registerBubble: (id: string, x: any, y: any, radius: number) => void;
+}
 
-  const initialX = React.useMemo(() => Math.random() * 150 - 75, []);
-  const initialY = React.useMemo(() => Math.random() * 150 - 75, []);
+const FloatingBubble: React.FC<FloatingBubbleProps> = ({ profile, isCurrentUser, registerBubble }) => {
+  const x = useMotionValue(Math.random() * 200 - 100);
+  const y = useMotionValue(Math.random() * 200 - 100);
 
   useEffect(() => {
-    let isActive = true;
-    const animateBubble = async () => {
-      // 無論如何先讓泡泡在初始座標顯現
-      await controls.set({ opacity: 1, scale: 1, x: initialX, y: initialY });
-      
-      while (isActive) {
-        await controls.start({
-          x: initialX + Math.random() * 80 - 40,
-          y: initialY + Math.random() * 80 - 40,
-          transition: { duration: 5 + Math.random() * 5, ease: "easeInOut" }
-        });
-      }
-    };
-    animateBubble();
-    return () => { isActive = false; };
-  }, [controls, initialX, initialY]);
+    // Current user's avatar is slightly larger, hence a bigger collision radius 
+    // Roughly matches the CSS dimensions + margin padding for visual breathing room
+    registerBubble(profile.id, x, y, isCurrentUser ? 75 : 55);
+  }, [profile.id, x, y, isCurrentUser, registerBubble]);
 
   return (
     <motion.div 
-      initial={{ x: initialX, y: initialY, opacity: 0, scale: 0.5 }}
-      animate={controls}
+      style={{ x, y, left: '50%', top: '50%', transform: 'translate(-50%, -50%)', position: 'absolute' }}
+      initial={{ opacity: 0, scale: 0.5 }}
+      animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.5 }}
-      className={`absolute flex flex-col items-center ${isCurrentUser ? 'z-30' : 'z-10'}`}
-      style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}
+      className={`flex flex-col items-center ${isCurrentUser ? 'z-30' : 'z-10'}`}
     >
       {/* Username */}
       <span className={`mb-2 font-bold text-xs uppercase tracking-tighter px-2 py-0.5 rounded-full ${isCurrentUser ? 'bg-[#007AFF] text-white' : 'bg-white/80 text-[#8E8E93] shadow-sm'}`}>
@@ -89,6 +81,106 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // --- Physics Engine Central State ---
+  const physicsState = React.useRef(new Map<string, {x: MotionValue<number>, y: MotionValue<number>, vx: number, vy: number, radius: number}>());
+
+  const registerBubble = React.useCallback((id: string, x: MotionValue<number>, y: MotionValue<number>, radius: number) => {
+    if (!physicsState.current.has(id)) {
+      // Initialize with random gentle velocity
+      physicsState.current.set(id, { 
+        x, y, 
+        vx: (Math.random() - 0.5) * 1.2, 
+        vy: (Math.random() - 0.5) * 1.2, 
+        radius 
+      });
+    } else {
+      const state = physicsState.current.get(id)!;
+      state.x = x;
+      state.y = y;
+      state.radius = radius;
+    }
+  }, []);
+
+  useEffect(() => {
+    let rafId: number;
+    let isActive = true;
+    
+    const physicsLoop = () => {
+      if (!isActive) return;
+
+      // Approximate Boundaries based on typical screen size, preventing bubbles from fully leaving screen
+      const boundaryW = (window.innerWidth / 2) - 80;
+      const boundaryH = (window.innerHeight / 2) - 130;
+      const bubbles = Array.from(physicsState.current.values()) as Array<{x: MotionValue<number>, y: MotionValue<number>, vx: number, vy: number, radius: number}>;
+
+      // 1. Position update and boundary collision
+      for (const state of bubbles) {
+        let cx = state.x.get();
+        let cy = state.y.get();
+        
+        cx += state.vx;
+        cy += state.vy;
+
+        if (cx < -boundaryW) { cx = -boundaryW; state.vx *= -1; }
+        if (cx > boundaryW) { cx = boundaryW; state.vx *= -1; }
+        if (cy < -boundaryH) { cy = -boundaryH; state.vy *= -1; }
+        if (cy > boundaryH) { cy = boundaryH; state.vy *= -1; }
+
+        state.x.set(cx);
+        state.y.set(cy);
+      }
+
+      // 2. Elastic Body Collisions
+      for (let i = 0; i < bubbles.length; i++) {
+        for (let j = i + 1; j < bubbles.length; j++) {
+          const a = bubbles[i];
+          const b = bubbles[j];
+
+          const dx = b.x.get() - a.x.get();
+          const dy = b.y.get() - a.y.get();
+          const dist = Math.hypot(dx, dy);
+          const minDist = a.radius + b.radius + 20; // 20px padding field
+
+          if (dist < minDist && dist > 0.01) {
+            // Normal vectors
+            const nx = dx / dist;
+            const ny = dy / dist;
+
+            // Force physical separation
+            const overlap = minDist - dist;
+            a.x.set(a.x.get() - nx * (overlap / 2));
+            a.y.set(a.y.get() - ny * (overlap / 2));
+            b.x.set(b.x.get() + nx * (overlap / 2));
+            b.y.set(b.y.get() + ny * (overlap / 2));
+
+            // Perfectly elastic collision velocity exchange (assuming equal mass 1)
+            const p = 2 * (a.vx * nx + a.vy * ny - b.vx * nx - b.vy * ny) / 2;
+            a.vx -= p * nx;
+            a.vy -= p * ny;
+            b.vx += p * nx;
+            b.vy += p * ny;
+
+            // Add micro-chaos to prevent locking states
+            a.vx += (Math.random() - 0.5) * 0.1;
+            a.vy += (Math.random() - 0.5) * 0.1;
+
+            // Speed limit clamp
+            const speedA = Math.hypot(a.vx, a.vy);
+            if (speedA > 2.5) { a.vx *= 2.5/speedA; a.vy *= 2.5/speedA; }
+            const speedB = Math.hypot(b.vx, b.vy);
+            if (speedB > 2.5) { b.vx *= 2.5/speedB; b.vy *= 2.5/speedB; }
+          }
+        }
+      }
+
+      rafId = requestAnimationFrame(physicsLoop);
+    };
+
+    rafId = requestAnimationFrame(physicsLoop);
+    return () => { isActive = false; cancelAnimationFrame(rafId); };
+  }, []);
+  // --- End Physics Engine ---
 
   useEffect(() => {
     if (userId) {
@@ -192,7 +284,8 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
                 <FloatingBubble 
                   key={profile.id} 
                   profile={profile} 
-                  isCurrentUser={profile.id === userId} 
+                  isCurrentUser={profile.id === userId}
+                  registerBubble={registerBubble} 
                 />
               ))}
             </>
