@@ -7,3 +7,5 @@ pydantic-settings
 python-dotenv
 cryptography
 pydantic
+greenlet
+psycopg2-binary

@@ -42,9 +42,10 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
       try {
         errorData = await response.json();
       } catch (e) {
-        errorData = { detail: '未知的後端錯誤' };
+        errorData = { detail: `API Error (Status: ${response.status})` };
+        console.error(`Detailed Error [${response.status}]:`, await response.text().catch(() => 'No text content'));
       }
-      throw new ApiError(response.status, errorData.detail || '請求失敗');
+      throw new ApiError(response.status, errorData.detail || `Request failed (${response.status})`);
     }
 
     return response.json();

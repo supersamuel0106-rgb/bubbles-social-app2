@@ -1,12 +1,11 @@
 {
-  "experimentalServices": {
-    "frontend": {
-      "routePrefix": "/",
-      "framework": "vite"
-    },
-    "backend": {
-      "entrypoint": "backend/main.py",
-      "routePrefix": "/api/v1"
-    }
-  }
+  "version": 2,
+  "builds": [
+    { "src": "package.json", "use": "@vercel/static-build" },
+    { "src": "backend/main.py", "use": "@vercel/python" }
+  ],
+  "rewrites": [
+    { "source": "/api/v1/(.*)", "destination": "backend/main.py" },
+    { "source": "/(.*)", "destination": "/" }
+  ]
 }
