@@ -17,7 +17,7 @@ class ProfileRepository:
             id=profile_data.id,
             username=profile_data.username,
             avatar_url=profile_data.avatar_url,
-            latest_message="Just joined Atelier!"
+            latest_message="Just joined Bubbles!"
         )
         self.session.add(new_profile)
         await self.session.commit()

@@ -25,7 +25,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, onBack, showBac
             </button>
           )}
         </div>
-        <h1 className="text-lg font-semibold tracking-tight shrink-0">{title || 'Atelier'}</h1>
+        <h1 className="text-lg font-semibold tracking-tight shrink-0">{title || 'Bubbles'}</h1>
         <div className="flex-1 flex justify-end">
           {headerRight}
         </div>

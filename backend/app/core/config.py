@@ -1,7 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "Atelier Social API"
+    PROJECT_NAME: str = "Bubbles Social API"
     # Postgres 連線字串 (Async版)
     DATABASE_URL: str
     # 用於驗證來自 Supabase 發出的 JWT token
