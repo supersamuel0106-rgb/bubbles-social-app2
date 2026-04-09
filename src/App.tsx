@@ -5,6 +5,7 @@ import { SignInScreen } from './screens/SignInScreen';
 import { InteractionScreen } from './screens/InteractionScreen';
 import { Screen } from './types';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
+import { useCurrentTime } from './lib/useCurrentTime';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('welcome');
@@ -12,6 +13,20 @@ export default function App() {
   const [configError, setConfigError] = useState(false);
   // NOTE: 啟動時先顯示加載畫面，偵測是否有已記住的 Session
   const [isInitializing, setIsInitializing] = useState(true);
+
+  /**
+   * NOTE: 全域後臺時鐘
+   * 目前僅追蹤時間，不顯示於介面。
+   * 未來可根據以下屬性擴展功能：
+   * - hour:      依時段切換主題 / 問候語
+   * - period:    'morning' | 'noon' | 'afternoon' | 'evening' | 'night' | 'dawn'
+   * - dayOfWeek: 依星期調整顯示內容
+   * - now:       計算事件倒數、時間差等
+   */
+  const currentTime = useCurrentTime();
+  // TODO: 在這裡根據 currentTime 擴展後續功能，例如：
+  // if (currentTime.period === 'night') → 啟用夜間模式
+  // if (currentTime.hour === 9) → 顯示早安通知
 
   useEffect(() => {
     if (!isSupabaseConfigured()) {
