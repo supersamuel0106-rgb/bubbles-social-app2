@@ -8,7 +8,13 @@ interface WelcomeScreenProps {
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onNavigate }) => {
   return (
-    <Layout title="Welcome">
+    <Layout 
+      title="Welcome"
+      onRefresh={async () => {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        console.log('WelcomeScreen refreshed');
+      }}
+    >
       <div className="flex flex-col items-center justify-center h-full px-8 pb-12">
         <div className="flex-1 flex flex-col items-center justify-center text-center space-y-6">
           <div className="space-y-4">

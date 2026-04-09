@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Loader2 } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -8,11 +8,62 @@ interface LayoutProps {
   onBack?: () => void;
   showBack?: boolean;
   headerRight?: React.ReactNode;
+  onRefresh?: () => Promise<void>;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ children, title, onBack, showBack, headerRight }) => {
+export const Layout: React.FC<LayoutProps> = ({ children, title, onBack, showBack, headerRight, onRefresh }) => {
+  const [pullProgress, setPullProgress] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isPulling, setIsPulling] = useState(false);
+  const mainRef = useRef<HTMLDivElement>(null);
+  const startY = useRef(0);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (mainRef.current?.scrollTop === 0 && onRefresh && !isRefreshing) {
+      startY.current = e.touches[0].clientY;
+      setIsPulling(true);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isPulling || isRefreshing) return;
+    const currentY = e.touches[0].clientY;
+    const deltaY = currentY - startY.current;
+    
+    if (deltaY > 0 && mainRef.current?.scrollTop === 0) {
+      // Add resistance
+      const progress = Math.min(deltaY / 2.5, 100);
+      setPullProgress(progress);
+      
+      // Prevent native scrolling when pulling down at the top
+      if (e.cancelable) e.preventDefault();
+    } else if (deltaY < 0) {
+      setIsPulling(false);
+      setPullProgress(0);
+    }
+  };
+
+  const handleTouchEnd = async () => {
+    if (!isPulling || isRefreshing) return;
+    
+    if (pullProgress > 60) {
+      setIsRefreshing(true);
+      setPullProgress(60); // Keep indicator visible while refreshing
+      try {
+        await onRefresh?.();
+      } finally {
+        setIsRefreshing(false);
+        setPullProgress(0);
+        setIsPulling(false);
+      }
+    } else {
+      setPullProgress(0);
+      setIsPulling(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-[#F2F2F7] text-[#1C1C1E] font-sans flex flex-col overflow-hidden">
+    <div className="min-h-screen bg-[#F2F2F7] text-[#1C1C1E] font-sans flex flex-col overflow-hidden select-none">
       {/* iOS-style Header */}
       <header className="h-16 flex items-center px-4 bg-white/80 backdrop-blur-md border-b border-[#C6C6C8] sticky top-0 z-50">
         <div className="flex-1 flex justify-start">
@@ -31,13 +82,54 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, onBack, showBac
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto relative">
+      <main 
+        ref={mainRef}
+        className="flex-1 overflow-y-auto relative"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        {/* Pull-to-Refresh Indicator */}
+        {onRefresh && (
+          <motion.div 
+            style={{ 
+              height: pullProgress,
+              opacity: pullProgress / 60,
+              y: -pullProgress,
+            }}
+            animate={{ 
+              y: 0,
+              height: isRefreshing ? 60 : pullProgress 
+            }}
+            className="absolute top-0 left-0 right-0 flex items-center justify-center overflow-hidden z-40 pointer-events-none"
+          >
+            <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/90 backdrop-blur-md shadow-sm border border-[#E5E5EA] transition-all ${pullProgress > 60 ? 'scale-110' : 'scale-100'}`}>
+              <motion.div
+                animate={isRefreshing ? { rotate: 360 } : { rotate: pullProgress * 5 }}
+                transition={isRefreshing ? { repeat: Infinity, duration: 1, ease: "linear" } : { type: "spring", stiffness: 200 }}
+              >
+                <Loader2 size={16} className="text-[#007AFF]" />
+              </motion.div>
+              <span className="text-[11px] font-bold text-[#1C1C1E]">
+                {isRefreshing ? '正在更新...' : pullProgress > 60 ? '放開即可更新' : '下拉更新'}
+              </span>
+            </div>
+          </motion.div>
+        )}
+
         <AnimatePresence mode="wait">
           <motion.div
+            key={title}
             initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
+            animate={{ 
+              opacity: 1, 
+              y: isRefreshing ? 60 : (pullProgress > 0 ? pullProgress : 0) 
+            }}
             exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+            transition={{ 
+              y: { type: "spring", stiffness: 300, damping: 30 },
+              opacity: { duration: 0.2 }
+            }}
             className="h-full"
           >
             {children}

@@ -90,7 +90,15 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ onNavigate }) => {
   };
 
   return (
-    <Layout title="Create Account" showBack onBack={() => onNavigate('welcome')}>
+    <Layout 
+      title="Create Account" 
+      showBack 
+      onBack={() => onNavigate('welcome')}
+      onRefresh={async () => {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        console.log('SignUpScreen refreshed');
+      }}
+    >
       <form onSubmit={handleSignUp} className="flex flex-col px-8 pt-8 pb-12 space-y-8">
         <div className="flex flex-col items-center space-y-4">
           <div 

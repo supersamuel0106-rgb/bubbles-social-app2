@@ -80,8 +80,6 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [pullProgress, setPullProgress] = useState(0);
 
   // --- Physics Engine Central State ---
   const physicsState = React.useRef(new Map<string, {x: MotionValue<number>, y: MotionValue<number>, vx: number, vy: number, radius: number}>());
@@ -223,10 +221,7 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
   };
 
   const handleRefresh = async () => {
-    setIsRefreshing(true);
     await fetchProfiles();
-    setIsRefreshing(false);
-    setPullProgress(0);
   };
 
   const handleSendMessage = async () => {
@@ -264,36 +259,9 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
   }
 
   return (
-    <Layout title="Interaction" headerRight={logoutButton}>
+    <Layout title="Interaction" headerRight={logoutButton} onRefresh={handleRefresh}>
       <div className="flex flex-col min-h-[calc(100vh-64px)] bg-[#F2F2F7]">
-        <motion.div 
-          className="flex-1 relative flex items-center justify-center overflow-hidden touch-none"
-          drag="y"
-          dragConstraints={{ top: 0, bottom: 0 }}
-          onDrag={(_, info) => {
-            if (info.offset.y > 0) setPullProgress(Math.min(info.offset.y / 1.2, 80));
-          }}
-          onDragEnd={(_, info) => {
-            if (info.offset.y > 100) handleRefresh();
-            else setPullProgress(0);
-          }}
-        >
-          {/* Pull Indicator */}
-          <motion.div 
-            style={{ y: pullProgress - 60 }} 
-            className="absolute top-0 left-0 right-0 flex justify-center p-4 z-[55] pointer-events-none"
-          >
-            <div className="bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-[#E5E5EA] px-4 py-2 flex items-center gap-2">
-              <motion.div 
-                animate={isRefreshing || pullProgress > 70 ? { rotate: 360 } : { rotate: pullProgress * 5 }}
-                transition={isRefreshing || pullProgress > 70 ? { repeat: Infinity, duration: 1, ease: "linear" } : {}}
-                className="w-4 h-4 border-2 border-[#007AFF] border-t-transparent rounded-full"
-              />
-              <span className="text-[11px] font-bold text-[#1C1C1E]">
-                {isRefreshing ? '正在更新...' : pullProgress > 70 ? '放開即可更新' : '下拉更新'}
-              </span>
-            </div>
-          </motion.div>
+        <div className="flex-1 relative flex items-center justify-center overflow-hidden touch-none">
 
           {error ? (
             <div className="flex flex-col items-center z-10">
@@ -325,7 +293,7 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
 
           <div className="absolute top-20 left-10 w-2 h-2 rounded-full bg-[#007AFF]/20 animate-pulse"></div>
           <div className="absolute bottom-40 right-10 w-3 h-3 rounded-full bg-[#5856D6]/20 animate-pulse delay-700"></div>
-        </motion.div>
+        </div>
 
         <div className="p-6 bg-white/80 backdrop-blur-xl border-t border-[#C6C6C8] pb-10 relative z-50">
           <div className="max-w-2xl mx-auto flex flex-col gap-2">
