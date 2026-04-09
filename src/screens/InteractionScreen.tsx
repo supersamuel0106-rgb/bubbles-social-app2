@@ -3,7 +3,7 @@ import { Layout, Button } from '../components/UI';
 import { Profile } from '../types';
 import { supabase } from '../lib/supabase';
 import { api, ConnectionError } from '../lib/api';
-import { motion, useMotionValue, MotionValue } from 'motion/react';
+import { motion, AnimatePresence, useMotionValue, MotionValue } from 'motion/react';
 import { Send, LogOut, RotateCcw } from 'lucide-react';
 
 interface InteractionScreenProps {
@@ -69,19 +69,23 @@ const FloatingBubble: React.FC<FloatingBubbleProps> = ({ profile, isCurrentUser,
           )}
         </div>
 
-        {/* Message Box — 定位於泡泡右上角，避免遮擋上方名稱 */}
-        <motion.div 
-          initial={{ scale: 0.8, opacity: 0, x: -10 }}
-          animate={{ scale: 1, opacity: 1, x: 0 }}
-          key={profile.latest_message}
-          className="absolute top-0 left-full ml-2 bg-white py-2 px-4 rounded-2xl rounded-bl-none shadow-2xl border border-[#E5E5EA] min-w-[120px] max-w-[180px] z-40 pointer-events-none"
-        >
-          <p className="text-[#1C1C1E] text-sm font-bold leading-tight break-words">
-            {profile.latest_message || "..."}
-          </p>
-          {/* 對話框小尾巴 - 指向泡泡 */}
-          <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border-l border-b border-[#E5E5EA] rotate-45"></div>
-        </motion.div>
+        {/* Message Box — 用 AnimatePresence 確保舊訊息完全退場後新訊息才進場 */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={profile.latest_message}
+            initial={{ opacity: 0, scale: 0.85, x: -8 }}
+            animate={{ opacity: 1, scale: 1, x: 0 }}
+            exit={{ opacity: 0, scale: 0.85, x: 8 }}
+            transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+            className="absolute top-0 left-full ml-2 bg-white py-2 px-4 rounded-2xl rounded-bl-none shadow-2xl border border-[#E5E5EA] min-w-[120px] max-w-[180px] z-40 pointer-events-none"
+          >
+            <p className="text-[#1C1C1E] text-sm font-bold leading-tight break-words">
+              {profile.latest_message || "..."}
+            </p>
+            {/* 對話框小尾巴 - 指向泡泡 */}
+            <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border-l border-b border-[#E5E5EA] rotate-45"></div>
+          </motion.div>
+        </AnimatePresence>
       </div>
     </motion.div>
   );
