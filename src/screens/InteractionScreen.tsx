@@ -35,7 +35,7 @@ const FloatingBubble: React.FC<FloatingBubbleProps> = ({ profile, isCurrentUser,
   const bubbleSize = BASE_SIZE * scaleFactor;
 
   return (
-    <motion.div 
+    <motion.div
       style={{ x, y, left: '50%', top: '50%', transform: 'translate(-50%, -50%)', position: 'absolute' }}
       initial={{ opacity: 0, scale: 0.5 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -54,9 +54,9 @@ const FloatingBubble: React.FC<FloatingBubbleProps> = ({ profile, isCurrentUser,
           className={`rounded-full p-1 bg-white shadow-2xl overflow-hidden flex items-center justify-center ${isCurrentUser ? 'ring-4 ring-[#007AFF]/30 border-2 border-[#007AFF]' : 'border border-white/50'}`}
         >
           {profile.avatar_url ? (
-            <img 
-              src={profile.avatar_url} 
-              alt={profile.username} 
+            <img
+              src={profile.avatar_url}
+              alt={profile.username}
               className="w-full h-full object-cover rounded-full"
               onError={(e) => {
                 e.currentTarget.src = 'https://picsum.photos/seed/error/200';
@@ -69,23 +69,16 @@ const FloatingBubble: React.FC<FloatingBubbleProps> = ({ profile, isCurrentUser,
           )}
         </div>
 
-        {/* Message Box — 用 AnimatePresence 確保舊訊息完全退場後新訊息才進場 */}
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={profile.latest_message}
-            initial={{ opacity: 0, scale: 0.85, x: -8 }}
-            animate={{ opacity: 1, scale: 1, x: 0 }}
-            exit={{ opacity: 0, scale: 0.85, x: 8 }}
-            transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-            className="absolute top-0 left-full ml-2 bg-white py-2 px-4 rounded-2xl rounded-bl-none shadow-2xl border border-[#E5E5EA] min-w-[120px] max-w-[180px] z-40 pointer-events-none"
-          >
+        {/* Message Box — 固定顯示，無切換動畫，確保最新狀態瞬間渲染 */}
+        {profile.latest_message ? (
+          <div className="absolute top-0 left-full ml-2 bg-white py-2 px-4 rounded-2xl rounded-bl-none shadow-2xl border border-[#E5E5EA] min-w-[100px] max-w-[180px] z-40 pointer-events-none">
             <p className="text-[#1C1C1E] text-sm font-bold leading-tight break-words">
-              {profile.latest_message || "..."}
+              {profile.latest_message}
             </p>
             {/* 對話框小尾巴 - 指向泡泡 */}
             <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border-l border-b border-[#E5E5EA] rotate-45"></div>
-          </motion.div>
-        </AnimatePresence>
+          </div>
+        ) : null}
       </div>
     </motion.div>
   );
@@ -99,15 +92,15 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
 
   // --- Physics Engine Central State ---
-  const physicsState = React.useRef(new Map<string, {x: MotionValue<number>, y: MotionValue<number>, vx: number, vy: number, radius: number}>());
+  const physicsState = React.useRef(new Map<string, { x: MotionValue<number>, y: MotionValue<number>, vx: number, vy: number, radius: number }>());
 
   const registerBubble = React.useCallback((id: string, x: MotionValue<number>, y: MotionValue<number>, radius: number) => {
     if (!physicsState.current.has(id)) {
-      physicsState.current.set(id, { 
-        x, y, 
-        vx: (Math.random() - 0.5) * 3.5, 
-        vy: (Math.random() - 0.5) * 3.5, 
-        radius 
+      physicsState.current.set(id, {
+        x, y,
+        vx: (Math.random() - 0.5) * 3.5,
+        vy: (Math.random() - 0.5) * 3.5,
+        radius
       });
     } else {
       const state = physicsState.current.get(id)!;
@@ -120,18 +113,18 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
   useEffect(() => {
     let rafId: number;
     let isActive = true;
-    
+
     const physicsLoop = () => {
       if (!isActive) return;
 
       const boundaryW = (window.innerWidth / 2) - 80;
       const boundaryH = (window.innerHeight / 2) - 130;
-      const bubbles = Array.from(physicsState.current.values()) as Array<{x: MotionValue<number>, y: MotionValue<number>, vx: number, vy: number, radius: number}>;
+      const bubbles = Array.from(physicsState.current.values()) as Array<{ x: MotionValue<number>, y: MotionValue<number>, vx: number, vy: number, radius: number }>;
 
       for (const state of bubbles) {
         let cx = state.x.get();
         let cy = state.y.get();
-        
+
         cx += state.vx;
         cy += state.vy;
 
@@ -172,9 +165,9 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
             a.vy += (Math.random() - 0.5) * 0.5;
 
             const speedA = Math.hypot(a.vx, a.vy);
-            if (speedA > 6.0) { a.vx *= 6.0/speedA; a.vy *= 6.0/speedA; }
+            if (speedA > 6.0) { a.vx *= 6.0 / speedA; a.vy *= 6.0 / speedA; }
             const speedB = Math.hypot(b.vx, b.vy);
-            if (speedB > 6.0) { b.vx *= 6.0/speedB; b.vy *= 6.0/speedB; }
+            if (speedB > 6.0) { b.vx *= 6.0 / speedB; b.vy *= 6.0 / speedB; }
           }
         }
       }
@@ -197,7 +190,7 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
         { event: 'UPDATE', schema: 'public', table: 'profiles' },
         (payload) => {
           const updatedProfile = payload.new as Profile;
-          setProfiles((prev) => 
+          setProfiles((prev) =>
             prev.map((p) => (p.id === updatedProfile.id ? updatedProfile : p))
           );
         }
@@ -275,7 +268,7 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
   };
 
   const refreshButton = (
-    <button 
+    <button
       type="button"
       onClick={handleRefresh}
       disabled={isManualRefreshing}
@@ -292,7 +285,7 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
   );
 
   const logoutButton = (
-    <button 
+    <button
       type="button"
       onClick={() => window.confirm('確定要登出嗎？') && onLogout()}
       className="absolute top-6 right-6 p-3 bg-white/80 backdrop-blur-md text-[#FF3B30] rounded-2xl shadow-lg border border-white/50 active:scale-90 transition-all z-[60]"
@@ -350,11 +343,11 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                 <span className="text-[11px] font-bold text-[#1C1C1E]">互動網域已連線 ({profiles.length} 位)</span>
               </div>
-              
+
               {profiles.map(profile => (
-                <FloatingBubble 
-                  key={profile.id} 
-                  profile={profile} 
+                <FloatingBubble
+                  key={profile.id}
+                  profile={profile}
                   isCurrentUser={profile.id === userId}
                   registerBubble={registerBubble}
                   scaleFactor={scaleFactor}
@@ -371,8 +364,8 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
           <div className="max-w-2xl mx-auto flex flex-col gap-2">
             <span className="text-xs text-[#8E8E93] font-medium ml-2">更新您的狀態留言</span>
             <div className="flex items-center gap-3 bg-[#F2F2F7] p-2 pl-5 rounded-full border border-[#E5E5EA] focus-within:bg-white transition-all">
-              <input 
-                type="text" 
+              <input
+                type="text"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
