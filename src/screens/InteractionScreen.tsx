@@ -241,7 +241,7 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
     const trimmed = message.trim();
     if (!trimmed) return;
 
-    // NOTE: 先做樂觀更新，讓訊息立即顯示在泡泡上，不必等 API 回應
+    // NOTE: 樂觀更新 — 立即在本地狀態更新訊息，使用者無需等待 API
     const previousProfiles = profiles;
     setProfiles(prev =>
       prev.map(p => p.id === userId ? { ...p, latest_message: trimmed } : p)
@@ -250,11 +250,13 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
 
     try {
       await api.updateMessage(userId, trimmed);
-      // NOTE: API 成功後靜默重新取一次，確保與伺服器同步
-      silentFetchProfiles();
+      // NOTE: 不在這裡呼叫 silentFetchProfiles()
+      // 原因：API 剛回應後立即拉取伺服器資料，可能得到更新前的舊快取，
+      // 反而會覆蓋掉上面的樂觀更新，造成對話框閃回舊訊息。
+      // Supabase Realtime 或 10 秒輪詢會在適當時機同步最新資料。
     } catch (err: any) {
       console.error('Error updating message:', err);
-      // 若 API 失敗，回滾至原本的狀態並還原輸入框
+      // API 失敗時回滾至原始狀態，並還原輸入框讓使用者重試
       setProfiles(previousProfiles);
       setMessage(trimmed);
     }
