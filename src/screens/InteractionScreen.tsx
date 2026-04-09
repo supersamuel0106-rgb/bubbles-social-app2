@@ -238,15 +238,25 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
   };
 
   const handleSendMessage = async () => {
-    if (!message.trim()) return;
+    const trimmed = message.trim();
+    if (!trimmed) return;
+
+    // NOTE: 先做樂觀更新，讓訊息立即顯示在泡泡上，不必等 API 回應
+    const previousProfiles = profiles;
+    setProfiles(prev =>
+      prev.map(p => p.id === userId ? { ...p, latest_message: trimmed } : p)
+    );
+    setMessage('');
+
     try {
-      await api.updateMessage(userId, message);
-      setProfiles(prev => prev.map(p => 
-        p.id === userId ? { ...p, latest_message: message } : p
-      ));
-      setMessage('');
+      await api.updateMessage(userId, trimmed);
+      // NOTE: API 成功後靜默重新取一次，確保與伺服器同步
+      silentFetchProfiles();
     } catch (err: any) {
       console.error('Error updating message:', err);
+      // 若 API 失敗，回滾至原本的狀態並還原輸入框
+      setProfiles(previousProfiles);
+      setMessage(trimmed);
     }
   };
 
