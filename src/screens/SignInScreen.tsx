@@ -36,6 +36,22 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ onNavigate, onLoginS
       if (!data.user) throw new Error('Sign in failed');
 
       console.log('Auth sign in success, user ID:', data.user.id);
+
+      // NOTE: 登入成功後詢問是否記住登入
+      // Supabase SDK 預設已將 session 儲存至 localStorage
+      // 如果使用者拒絕，就在 sessionStorage 記錄一個標記
+      // 然後 app 啟動時下次偵測到此標記就签出
+      const rememberMe = window.confirm(
+        '是否記住登入？\n\n選擇「確定」，下次開啟 App 將自動登入此帳號。\n選擇「取消」，將在下次關閉後自動登出。'
+      );
+
+      if (!rememberMe) {
+        // NOTE: 將「拒絕記住」標記存入 localStorage，下次 App 啟動時偵測到後自動登出
+        localStorage.setItem('bubbles_persist_declined', 'true');
+      } else {
+        localStorage.removeItem('bubbles_persist_declined');
+      }
+
       onLoginSuccess(data.user.id);
     } catch (err: any) {
       console.error('Sign in error details:', err);

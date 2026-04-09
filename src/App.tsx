@@ -10,11 +10,39 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('welcome');
   const [userId, setUserId] = useState<string | null>(null);
   const [configError, setConfigError] = useState(false);
+  // NOTE: 啟動時先顯示加載畫面，偵測是否有已記住的 Session
+  const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
     if (!isSupabaseConfigured()) {
       setConfigError(true);
+      setIsInitializing(false);
+      return;
     }
+
+    // 偵測是否有已存在的 Supabase Session（登入已記住）
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        // NOTE: 若使用者上次選擇「不記住登入」，sessionStorage 中會有標記
+        // sessionStorage 只在同一瀏覽器分頁中存活
+        // 當使用者關閉分頁後重新開啟，sessionStorage 會被清除
+        // 此時 no_persist 為 null，代表是全新啟動。需要判斷是否應自動登入：
+        // - 有 no_persist = 'true'：使用者主動選了「不記住」，但這只在同一分頁有效 → 繼續登入
+        // - 沒有 no_persist：可能是選了記住(直接恢復)，或是選了不記住但已重開分頁
+        //   → 無法區分，採用保守策略：檢查 localStorage 中是否有明確的拒絕標記
+        const persistDeclined = localStorage.getItem('bubbles_persist_declined');
+        if (persistDeclined === 'true') {
+          // 使用者上次明確拒絕記住登入 → 清除 session，回到歡迎頁
+          await supabase.auth.signOut();
+          localStorage.removeItem('bubbles_persist_declined');
+        } else {
+          // 使用者選擇了記住登入，或是首次登入尚未選擇 → 恢復 session
+          setUserId(session.user.id);
+          setCurrentScreen('interaction');
+        }
+      }
+      setIsInitializing(false);
+    });
   }, []);
 
   const handleLogout = async () => {
@@ -50,6 +78,18 @@ export default function App() {
     setUserId(id);
     setCurrentScreen('interaction');
   };
+
+  // 啟動時等待 Session 偵測完成
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F2F2F7]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-4 border-[#007AFF] border-t-transparent rounded-full animate-spin" />
+          <p className="text-[#8E8E93] text-sm font-medium">正在初始化...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
