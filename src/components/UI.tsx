@@ -8,11 +8,12 @@ interface LayoutProps {
   onBack?: () => void;
   showBack?: boolean;
   headerRight?: React.ReactNode;
+  headerLeft?: React.ReactNode;
   onRefresh?: () => Promise<void>;
   hideHeader?: boolean;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ children, title, onBack, showBack, headerRight, onRefresh, hideHeader }) => {
+export const Layout: React.FC<LayoutProps> = ({ children, title, onBack, showBack, headerRight, headerLeft, onRefresh, hideHeader }) => {
   const [pullProgress, setPullProgress] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isPulling, setIsPulling] = useState(false);
@@ -63,20 +64,57 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, onBack, showBac
     }
   };
 
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (mainRef.current?.scrollTop === 0 && onRefresh && !isRefreshing) {
+      startY.current = e.clientY;
+      setIsPulling(true);
+      
+      const handleMouseMove = (e: MouseEvent) => {
+        const deltaY = e.clientY - startY.current;
+        if (deltaY > 0 && mainRef.current?.scrollTop === 0) {
+          setPullProgress(Math.min(deltaY / 2.5, 100));
+        }
+      };
+      
+      const handleMouseUp = async () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+        
+        if (pullProgress > 60) {
+          setIsRefreshing(true);
+          setPullProgress(60);
+          try {
+            await onRefresh?.();
+          } finally {
+            setIsRefreshing(false);
+            setPullProgress(0);
+            setIsPulling(false);
+          }
+        } else {
+          setPullProgress(0);
+          setIsPulling(false);
+        }
+      };
+      
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#F2F2F7] text-[#1C1C1E] font-sans flex flex-col overflow-hidden select-none">
       {/* iOS-style Header */}
       {!hideHeader && (
         <header className="h-16 flex items-center px-4 bg-white/80 backdrop-blur-md border-b border-[#C6C6C8] sticky top-0 z-50">
           <div className="flex-1 flex justify-start">
-            {showBack && (
+            {showBack ? (
               <button 
                 onClick={onBack}
                 className="p-2 -ml-2 text-[#007AFF] active:opacity-30 transition-opacity"
               >
                 <ChevronLeft size={28} />
               </button>
-            )}
+            ) : headerLeft}
           </div>
           <h1 className="text-lg font-semibold tracking-tight shrink-0">{title || 'Bubbles'}</h1>
           <div className="flex-1 flex justify-end">
@@ -91,6 +129,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, onBack, showBac
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        onMouseDown={handleMouseDown}
       >
         {/* Pull-to-Refresh Indicator */}
         {onRefresh && (

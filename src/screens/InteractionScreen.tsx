@@ -4,7 +4,7 @@ import { Profile } from '../types';
 import { supabase } from '../lib/supabase';
 import { api, ConnectionError } from '../lib/api';
 import { motion, useMotionValue, MotionValue } from 'motion/react';
-import { Send, LogOut } from 'lucide-react';
+import { Send, LogOut, RotateCcw } from 'lucide-react';
 
 interface InteractionScreenProps {
   userId: string;
@@ -248,6 +248,17 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
     }
   };
 
+  const refreshButton = (
+    <button 
+      type="button"
+      onClick={handleRefresh}
+      className="p-2 -ml-2 text-[#007AFF] active:opacity-30 transition-opacity flex items-center gap-1"
+      title="刷新頁面"
+    >
+      <RotateCcw size={24} />
+    </button>
+  );
+
   const logoutButton = (
     <button 
       type="button"
@@ -274,7 +285,7 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
 
   if (loading && profiles.length === 0) {
     return (
-      <Layout title="Interaction" headerRight={logoutButton}>
+      <Layout title="Interaction" headerLeft={refreshButton} headerRight={logoutButton} onRefresh={handleRefresh}>
         <div className="flex items-center justify-center h-full">
           <div className="w-8 h-8 border-4 border-[#007AFF] border-t-transparent rounded-full animate-spin"></div>
         </div>
@@ -283,7 +294,12 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
   }
 
   return (
-    <Layout title="Interaction" headerRight={logoutButton} onRefresh={handleRefresh}>
+    <Layout 
+      title="Interaction" 
+      headerLeft={refreshButton} 
+      headerRight={logoutButton} 
+      onRefresh={handleRefresh}
+    >
       <div className="flex flex-col min-h-[calc(100vh-64px)] bg-[#F2F2F7]">
         <div className="flex-1 relative flex items-center justify-center overflow-hidden touch-none">
 
