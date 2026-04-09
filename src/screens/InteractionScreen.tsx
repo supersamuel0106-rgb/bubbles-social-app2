@@ -69,16 +69,25 @@ const FloatingBubble: React.FC<FloatingBubbleProps> = ({ profile, isCurrentUser,
           )}
         </div>
 
-        {/* Message Box — 固定顯示，無切換動畫，確保最新狀態瞬間渲染 */}
-        {profile.latest_message ? (
-          <div className="absolute top-0 left-full ml-2 bg-white py-2 px-4 rounded-2xl rounded-bl-none shadow-2xl border border-[#E5E5EA] min-w-[100px] max-w-[180px] z-40 pointer-events-none">
-            <p className="text-[#1C1C1E] text-sm font-bold leading-tight break-words">
-              {profile.latest_message}
-            </p>
-            {/* 對話框小尾巴 - 指向泡泡 */}
-            <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border-l border-b border-[#E5E5EA] rotate-45"></div>
-          </div>
-        ) : null}
+        {/* Message Box — 不使用 mode="wait" 避免退場動畫阻塞更新 */}
+        <AnimatePresence>
+          {profile.latest_message ? (
+            <motion.div
+              key={profile.latest_message}
+              initial={{ opacity: 0, scale: 0.85, x: -8 }}
+              animate={{ opacity: 1, scale: 1, x: 0 }}
+              exit={{ opacity: 0, scale: 0.85, x: 8 }}
+              transition={{ duration: 0.2 }}
+              className="absolute top-0 left-full ml-2 bg-white py-2 px-4 rounded-2xl rounded-bl-none shadow-2xl border border-[#E5E5EA] min-w-[120px] max-w-[180px] z-40 pointer-events-none"
+            >
+              <p className="text-[#1C1C1E] text-sm font-bold leading-tight break-words">
+                {profile.latest_message}
+              </p>
+              {/* 對話框小尾巴 - 指向泡泡 */}
+              <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border-l border-b border-[#E5E5EA] rotate-45"></div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
       </div>
     </motion.div>
   );
@@ -189,9 +198,12 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'profiles' },
         (payload) => {
+          console.log('Realtime update received:', payload);
           const updatedProfile = payload.new as Profile;
-          setProfiles((prev) =>
-            prev.map((p) => (p.id === updatedProfile.id ? updatedProfile : p))
+          if (!updatedProfile) return;
+          
+          setProfiles((prev) => 
+            prev.map((p) => (p.id.toLowerCase() === updatedProfile.id.toLowerCase() ? { ...p, ...updatedProfile } : p))
           );
         }
       )
@@ -246,22 +258,28 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
     const trimmed = message.trim();
     if (!trimmed) return;
 
-    // NOTE: 樂觀更新 — 立即在本地狀態更新訊息，使用者無需等待 API
+    console.log('Sending message:', trimmed, 'User ID:', userId);
+
+    // 樂觀更新：立即更新本地狀態
     const previousProfiles = profiles;
-    setProfiles(prev =>
-      prev.map(p => p.id === userId ? { ...p, latest_message: trimmed } : p)
-    );
+    setProfiles(prev => {
+      const isFound = prev.some(p => p.id.toLowerCase() === userId?.toLowerCase());
+      console.log('Finding user for optimistic update:', isFound ? 'Success' : 'Failed');
+      
+      return prev.map(p => 
+        p.id.toLowerCase() === userId?.toLowerCase() 
+          ? { ...p, latest_message: trimmed } 
+          : p
+      );
+    });
     setMessage('');
 
     try {
       await api.updateMessage(userId, trimmed);
-      // NOTE: 不在這裡呼叫 silentFetchProfiles()
-      // 原因：API 剛回應後立即拉取伺服器資料，可能得到更新前的舊快取，
-      // 反而會覆蓋掉上面的樂觀更新，造成對話框閃回舊訊息。
-      // Supabase Realtime 或 10 秒輪詢會在適當時機同步最新資料。
+      console.log('Backend update successful');
     } catch (err: any) {
       console.error('Error updating message:', err);
-      // API 失敗時回滾至原始狀態，並還原輸入框讓使用者重試
+      // API 失敗時回滾
       setProfiles(previousProfiles);
       setMessage(trimmed);
     }
