@@ -238,7 +238,15 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
   };
 
   const handleRefresh = async () => {
-    await fetchProfiles();
+    // NOTE: 使用靜默刷新，不觸發 loading 狀態
+    // 若使用 fetchProfiles，setLoading(true) 會導致 FloatingBubble 重新掛載
+    // 造成物理引擎位置重置（泡泡亂跳）且訊息顯示短暫中斷
+    setIsManualRefreshing(true);
+    try {
+      await silentFetchProfiles();
+    } finally {
+      setTimeout(() => setIsManualRefreshing(false), 600);
+    }
   };
 
   const handleSendMessage = async () => {
@@ -338,7 +346,7 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
             </div>
           ) : (
             <>
-              <div className="absolute top-6 left-6 flex items-center gap-2 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl shadow-lg border border-[#E5E5EA] z-[50]">
+              <div className="absolute top-20 left-6 flex items-center gap-2 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl shadow-lg border border-[#E5E5EA] z-[50]">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                 <span className="text-[11px] font-bold text-[#1C1C1E]">互動網域已連線 ({profiles.length} 位)</span>
               </div>
