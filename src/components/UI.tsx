@@ -9,9 +9,10 @@ interface LayoutProps {
   showBack?: boolean;
   headerRight?: React.ReactNode;
   onRefresh?: () => Promise<void>;
+  hideHeader?: boolean;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ children, title, onBack, showBack, headerRight, onRefresh }) => {
+export const Layout: React.FC<LayoutProps> = ({ children, title, onBack, showBack, headerRight, onRefresh, hideHeader }) => {
   const [pullProgress, setPullProgress] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isPulling, setIsPulling] = useState(false);
@@ -65,22 +66,24 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, onBack, showBac
   return (
     <div className="min-h-screen bg-[#F2F2F7] text-[#1C1C1E] font-sans flex flex-col overflow-hidden select-none">
       {/* iOS-style Header */}
-      <header className="h-16 flex items-center px-4 bg-white/80 backdrop-blur-md border-b border-[#C6C6C8] sticky top-0 z-50">
-        <div className="flex-1 flex justify-start">
-          {showBack && (
-            <button 
-              onClick={onBack}
-              className="p-2 -ml-2 text-[#007AFF] active:opacity-30 transition-opacity"
-            >
-              <ChevronLeft size={28} />
-            </button>
-          )}
-        </div>
-        <h1 className="text-lg font-semibold tracking-tight shrink-0">{title || 'Bubbles'}</h1>
-        <div className="flex-1 flex justify-end">
-          {headerRight}
-        </div>
-      </header>
+      {!hideHeader && (
+        <header className="h-16 flex items-center px-4 bg-white/80 backdrop-blur-md border-b border-[#C6C6C8] sticky top-0 z-50">
+          <div className="flex-1 flex justify-start">
+            {showBack && (
+              <button 
+                onClick={onBack}
+                className="p-2 -ml-2 text-[#007AFF] active:opacity-30 transition-opacity"
+              >
+                <ChevronLeft size={28} />
+              </button>
+            )}
+          </div>
+          <h1 className="text-lg font-semibold tracking-tight shrink-0">{title || 'Bubbles'}</h1>
+          <div className="flex-1 flex justify-end">
+            {headerRight}
+          </div>
+        </header>
+      )}
 
       <main 
         ref={mainRef}
