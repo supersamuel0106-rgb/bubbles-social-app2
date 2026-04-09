@@ -92,6 +92,7 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
 
   // --- Physics Engine Central State ---
   const physicsState = React.useRef(new Map<string, {x: MotionValue<number>, y: MotionValue<number>, vx: number, vy: number, radius: number}>());
@@ -253,10 +254,16 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
     <button 
       type="button"
       onClick={handleRefresh}
-      className="absolute top-6 left-6 p-3 bg-white/80 backdrop-blur-md text-[#007AFF] rounded-2xl shadow-lg border border-white/50 active:scale-90 transition-all z-[60]"
+      disabled={isManualRefreshing}
+      className={`absolute top-6 left-6 p-3 bg-white/80 backdrop-blur-md text-[#007AFF] rounded-2xl shadow-lg border border-white/50 active:scale-90 transition-all z-[60] ${isManualRefreshing ? 'opacity-70' : ''}`}
       title="刷新頁面"
     >
-      <RotateCcw size={24} />
+      <motion.div
+        animate={isManualRefreshing ? { rotate: 360 } : { rotate: 0 }}
+        transition={isManualRefreshing ? { repeat: Infinity, duration: 1, ease: "linear" } : { duration: 0.2 }}
+      >
+        <RotateCcw size={24} />
+      </motion.div>
     </button>
   );
 
