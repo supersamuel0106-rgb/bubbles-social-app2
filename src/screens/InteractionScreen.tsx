@@ -252,7 +252,7 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
     <button 
       type="button"
       onClick={handleRefresh}
-      className="p-2 -ml-2 text-[#007AFF] active:opacity-30 transition-opacity flex items-center gap-1"
+      className="absolute top-6 left-6 p-3 bg-white/80 backdrop-blur-md text-[#007AFF] rounded-2xl shadow-lg border border-white/50 active:scale-90 transition-all z-[60]"
       title="刷新頁面"
     >
       <RotateCcw size={24} />
@@ -263,10 +263,10 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
     <button 
       type="button"
       onClick={() => window.confirm('確定要登出嗎？') && onLogout()}
-      className="px-3 py-1.5 flex items-center gap-1.5 bg-[#FF3B30] text-white rounded-lg active:opacity-70 z-[60]"
+      className="absolute top-6 right-6 p-3 bg-white/80 backdrop-blur-md text-[#FF3B30] rounded-2xl shadow-lg border border-white/50 active:scale-90 transition-all z-[60]"
+      title="登出"
     >
-      <LogOut size={16} />
-      <span className="text-sm font-semibold">登出</span>
+      <LogOut size={24} />
     </button>
   );
 
@@ -285,8 +285,10 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
 
   if (loading && profiles.length === 0) {
     return (
-      <Layout title="Interaction" headerLeft={refreshButton} headerRight={logoutButton} onRefresh={handleRefresh}>
-        <div className="flex items-center justify-center h-full">
+      <Layout hideHeader onRefresh={handleRefresh}>
+        <div className="flex items-center justify-center h-full relative">
+          {refreshButton}
+          {logoutButton}
           <div className="w-8 h-8 border-4 border-[#007AFF] border-t-transparent rounded-full animate-spin"></div>
         </div>
       </Layout>
@@ -294,14 +296,11 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
   }
 
   return (
-    <Layout 
-      title="Interaction" 
-      headerLeft={refreshButton} 
-      headerRight={logoutButton} 
-      onRefresh={handleRefresh}
-    >
-      <div className="flex flex-col min-h-[calc(100vh-64px)] bg-[#F2F2F7]">
+    <Layout hideHeader onRefresh={handleRefresh}>
+      <div className="flex flex-col h-screen bg-[#F2F2F7]">
         <div className="flex-1 relative flex items-center justify-center overflow-hidden touch-none">
+          {refreshButton}
+          {logoutButton}
 
           {error ? (
             <div className="flex flex-col items-center z-10">
