@@ -15,16 +15,24 @@ interface FloatingBubbleProps {
   profile: Profile;
   isCurrentUser: boolean;
   registerBubble: (id: string, x: MotionValue<number>, y: MotionValue<number>, radius: number) => void;
+  scaleFactor: number;
 }
 
-const FloatingBubble: React.FC<FloatingBubbleProps> = ({ profile, isCurrentUser, registerBubble }) => {
+const FloatingBubble: React.FC<FloatingBubbleProps> = ({ profile, isCurrentUser, registerBubble, scaleFactor }) => {
   const x = useMotionValue(Math.random() * 200 - 100);
   const y = useMotionValue(Math.random() * 200 - 100);
 
+  // NOTE: 碰撞半徑需要與視覺大小同步縮放，確保物理引擎正確
+  const BASE_RADIUS = 58;
+  const radius = BASE_RADIUS * scaleFactor;
+
   useEffect(() => {
-    // 設定精確的物理碰撞半徑
-    registerBubble(profile.id, x, y, 58);
-  }, [profile.id, x, y, registerBubble]);
+    registerBubble(profile.id, x, y, radius);
+  }, [profile.id, x, y, registerBubble, radius]);
+
+  // 基礎泡泡大小（px）：96 對應 w-24
+  const BASE_SIZE = 96;
+  const bubbleSize = BASE_SIZE * scaleFactor;
 
   return (
     <motion.div 
@@ -34,14 +42,17 @@ const FloatingBubble: React.FC<FloatingBubbleProps> = ({ profile, isCurrentUser,
       exit={{ opacity: 0, scale: 0.5 }}
       className={`flex flex-col items-center ${isCurrentUser ? 'z-30' : 'z-10'}`}
     >
-      {/* Username */}
-      <span className={`mb-2 font-bold text-xs uppercase tracking-tighter px-2 py-0.5 rounded-full ${isCurrentUser ? 'bg-[#007AFF] text-white' : 'bg-white/80 text-[#8E8E93] shadow-sm'}`}>
+      {/* NOTE: 使用者名稱標籤維持固定大小，不隨人數縮小 */}
+      <span className={`mb-2 font-bold text-xs uppercase tracking-tighter px-2 py-0.5 rounded-full whitespace-nowrap ${isCurrentUser ? 'bg-[#007AFF] text-white' : 'bg-white/80 text-[#8E8E93] shadow-sm'}`}>
         {profile.username}
       </span>
 
-      {/* Avatar Bubble */}
-      <div className="relative">
-        <div className={`w-24 h-24 sm:w-32 sm:h-32 rounded-full p-1 bg-white shadow-2xl overflow-hidden flex items-center justify-center ${isCurrentUser ? 'ring-4 ring-[#007AFF]/30 border-2 border-[#007AFF]' : 'border border-white/50'}`}>
+      {/* Avatar Bubble — 依 scaleFactor 縮放 */}
+      <div className="relative" style={{ width: bubbleSize, height: bubbleSize }}>
+        <div
+          style={{ width: bubbleSize, height: bubbleSize }}
+          className={`rounded-full p-1 bg-white shadow-2xl overflow-hidden flex items-center justify-center ${isCurrentUser ? 'ring-4 ring-[#007AFF]/30 border-2 border-[#007AFF]' : 'border border-white/50'}`}
+        >
           {profile.avatar_url ? (
             <img 
               src={profile.avatar_url} 
@@ -248,6 +259,19 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
     </button>
   );
 
+  /**
+   * NOTE: 線性縮放公式
+   * 人數 <= 4：scaleFactor = 1.0（原始大小）
+   * 人數 >= 20：scaleFactor = 0.25（縮小至 1/4）
+   * 中間值：線性插值
+   */
+  const MIN_COUNT = 4;
+  const MAX_COUNT = 20;
+  const MIN_SCALE = 0.25;
+  const MAX_SCALE = 1.0;
+  const clampedCount = Math.max(MIN_COUNT, Math.min(profiles.length, MAX_COUNT));
+  const scaleFactor = MAX_SCALE - (MAX_SCALE - MIN_SCALE) * ((clampedCount - MIN_COUNT) / (MAX_COUNT - MIN_COUNT));
+
   if (loading && profiles.length === 0) {
     return (
       <Layout title="Interaction" headerRight={logoutButton}>
@@ -285,7 +309,8 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
                   key={profile.id} 
                   profile={profile} 
                   isCurrentUser={profile.id === userId}
-                  registerBubble={registerBubble} 
+                  registerBubble={registerBubble}
+                  scaleFactor={scaleFactor}
                 />
               ))}
             </>
