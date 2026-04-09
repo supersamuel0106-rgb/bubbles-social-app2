@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { api, ConnectionError } from '../lib/api';
 import { motion, AnimatePresence, useMotionValue, MotionValue } from 'motion/react';
 import { Send, LogOut, RotateCcw } from 'lucide-react';
+import { useCurrentTime } from '../lib/useCurrentTime';
 
 interface InteractionScreenProps {
   userId: string;
@@ -15,10 +16,11 @@ interface FloatingBubbleProps {
   profile: Profile;
   isCurrentUser: boolean;
   registerBubble: (id: string, x: MotionValue<number>, y: MotionValue<number>, radius: number) => void;
+  unregisterBubble: (id: string) => void;
   scaleFactor: number;
 }
 
-const FloatingBubble: React.FC<FloatingBubbleProps> = ({ profile, isCurrentUser, registerBubble, scaleFactor }) => {
+const FloatingBubble: React.FC<FloatingBubbleProps> = ({ profile, isCurrentUser, registerBubble, unregisterBubble, scaleFactor }) => {
   const x = useMotionValue(Math.random() * 200 - 100);
   const y = useMotionValue(Math.random() * 200 - 100);
 
@@ -28,7 +30,8 @@ const FloatingBubble: React.FC<FloatingBubbleProps> = ({ profile, isCurrentUser,
 
   useEffect(() => {
     registerBubble(profile.id, x, y, radius);
-  }, [profile.id, x, y, registerBubble, radius]);
+    return () => unregisterBubble(profile.id);
+  }, [profile.id, x, y, registerBubble, unregisterBubble, radius]);
 
   // 基礎泡泡大小（px）：96 對應 w-24
   const BASE_SIZE = 96;
@@ -117,6 +120,10 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
       state.y = y;
       state.radius = radius;
     }
+  }, []);
+
+  const unregisterBubble = React.useCallback((id: string) => {
+    physicsState.current.delete(id);
   }, []);
 
   useEffect(() => {
@@ -314,16 +321,30 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
   );
 
   /**
-   * NOTE: 線性縮放公式
-   * 人數 <= 4：scaleFactor = 1.0（原始大小）
-   * 人數 >= 20：scaleFactor = 0.25（縮小至 1/4）
-   * 中間值：線性插值
+   * NOTE: 狀態留言過濾與效期邏輯
+   * 1. 必須有留言內容
+   * 2. 留言時間必須在 24 小時內
+   */
+  const currentTime = useCurrentTime();
+  const EXPIRATION_MS = 24 * 60 * 60 * 1000;
+
+  const activeProfiles = profiles.filter(p => {
+    if (!p.latest_message || p.latest_message.trim() === '') return false;
+    
+    // 計算留言時間差
+    const updatedAt = new Date(p.updated_at).getTime();
+    const now = currentTime.now.getTime();
+    return (now - updatedAt) < EXPIRATION_MS;
+  });
+
+  /**
+   * NOTE: 線性縮放公式 (基於活躍人數)
    */
   const MIN_COUNT = 4;
   const MAX_COUNT = 20;
   const MIN_SCALE = 0.25;
   const MAX_SCALE = 1.0;
-  const clampedCount = Math.max(MIN_COUNT, Math.min(profiles.length, MAX_COUNT));
+  const clampedCount = Math.max(MIN_COUNT, Math.min(activeProfiles.length, MAX_COUNT));
   const scaleFactor = MAX_SCALE - (MAX_SCALE - MIN_SCALE) * ((clampedCount - MIN_COUNT) / (MAX_COUNT - MIN_COUNT));
 
   if (loading && profiles.length === 0) {
@@ -350,19 +371,25 @@ export const InteractionScreen: React.FC<InteractionScreenProps> = ({ userId, on
               <p className="text-[#FF3B30] mb-4 bg-white/80 px-4 py-2 rounded-lg">{error}</p>
               <Button onClick={fetchProfiles} className="w-auto px-6 h-10 text-sm">重試</Button>
             </div>
-          ) : profiles.length === 0 ? (
-            <div className="flex flex-col items-center z-10">
-              <p className="text-[#8E8E93] mb-4">目前沒有其他人在線上...</p>
-              <Button onClick={fetchProfiles} className="w-auto px-6 h-10 text-sm">刷新</Button>
+          ) : activeProfiles.length === 0 ? (
+            <div className="flex flex-col items-center z-10 text-center px-6">
+              <div className="w-16 h-16 bg-white/50 rounded-full flex items-center justify-center mb-4 backdrop-blur-md border border-white/20">
+                <Send size={32} className="text-[#8E8E93]" />
+              </div>
+              <p className="text-[#8E8E93] font-medium mb-1">目前沒有活躍的狀態</p>
+              <p className="text-[#8E8E93]/70 text-xs max-w-[200px] mb-4">發布您的第一則留言，加入互動網域吧！</p>
+              <Button onClick={fetchProfiles} className="w-auto px-6 h-10 text-sm">重新整理</Button>
             </div>
           ) : (
             <>
               <div className="absolute top-20 left-6 flex items-center gap-2 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl shadow-lg border border-[#E5E5EA] z-[50]">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-[11px] font-bold text-[#1C1C1E]">互動網域已連線 ({profiles.length} 位)</span>
+                <span className="text-[11px] font-bold text-[#1C1C1E]">
+                  互動網域已連線 ({activeProfiles.length} 位活躍)
+                </span>
               </div>
 
-              {profiles.map(profile => (
+              {activeProfiles.map(profile => (
                 <FloatingBubble
                   key={profile.id}
                   profile={profile}
