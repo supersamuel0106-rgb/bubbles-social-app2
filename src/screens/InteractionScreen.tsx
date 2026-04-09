@@ -69,17 +69,18 @@ const FloatingBubble: React.FC<FloatingBubbleProps> = ({ profile, isCurrentUser,
           )}
         </div>
 
-        {/* Message Box */}
+        {/* Message Box — 定位於泡泡右上角，避免遮擋上方名稱 */}
         <motion.div 
-          initial={{ scale: 0.8, opacity: 0, y: 10 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
+          initial={{ scale: 0.8, opacity: 0, x: -10 }}
+          animate={{ scale: 1, opacity: 1, x: 0 }}
           key={profile.latest_message}
-          className="absolute -top-10 -right-10 bg-white py-3 px-5 rounded-3xl rounded-bl-none shadow-2xl border border-[#E5E5EA] max-w-[200px] z-40"
+          className="absolute top-0 left-full ml-2 bg-white py-2 px-4 rounded-2xl rounded-bl-none shadow-2xl border border-[#E5E5EA] min-w-[120px] max-w-[180px] z-40 pointer-events-none"
         >
-          <p className="text-[#1C1C1E] text-base font-bold leading-tight break-words">
+          <p className="text-[#1C1C1E] text-sm font-bold leading-tight break-words">
             {profile.latest_message || "..."}
           </p>
-          <div className="absolute -bottom-2 left-0 w-4 h-4 bg-white border-l border-b border-[#E5E5EA] rotate-45 -translate-y-2"></div>
+          {/* 對話框小尾巴 - 指向泡泡 */}
+          <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border-l border-b border-[#E5E5EA] rotate-45"></div>
         </motion.div>
       </div>
     </motion.div>
